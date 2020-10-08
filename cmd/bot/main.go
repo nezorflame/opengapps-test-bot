@@ -5,11 +5,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/nezorflame/example-telegram-bot/internal/pkg/config"
-	"github.com/nezorflame/example-telegram-bot/internal/pkg/db"
-	"github.com/nezorflame/example-telegram-bot/pkg/telegram"
+	"github.com/nezorflame/opengapps-test-bot/internal/pkg/config"
+	"github.com/nezorflame/opengapps-test-bot/internal/pkg/storage"
+	"github.com/nezorflame/opengapps-test-bot/pkg/telegram"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -51,36 +50,55 @@ func main() {
 	log.Info("Config parsed")
 
 	// init DB
-	dbInstance, err := db.New(cfg.GetString("db.path"), cfg.GetDuration("db.timeout"))
+	db, err := storage.New(cfg.GetString("db.path"), cfg.GetDuration("db.timeout"))
 	if err != nil {
 		log.WithError(err).Fatal("Unable to init DB")
 	}
 	log.Info("DB initiated")
 
 	// create bot
-	bot, err := telegram.NewBot(ctx, cfg)
+	bot, err := telegram.NewBot(cfg)
 	if err != nil {
 		log.WithError(err).Fatal("Unable to create bot")
 	}
 	log.Info("Bot created")
 
-	// init graceful stop chan
-	log.Debug("Initiating system signal watcher")
-	var gracefulStop = make(chan os.Signal)
-	signal.Notify(gracefulStop, syscall.SIGTERM)
-	signal.Notify(gracefulStop, syscall.SIGINT)
-
-	go func() {
-		sig := <-gracefulStop
-		log.Warnf("Caught sig %+v, stopping the app", sig)
-		cancel()
-		bot.Stop()
-		dbInstance.Close(false)
-		time.Sleep(200 * time.Millisecond)
-		os.Exit(0)
-	}()
-
 	// start the bot
 	log.Info("Starting the bot")
-	bot.Start()
+	if err = bot.Start(-1); err != nil {
+		log.WithError(err).Fatal("Unable to start the bot")
+	}
+
+	// graceful shutdown
+	log.Debug("Initiating system signal watcher")
+	<-gracefulShutdown(ctx, bot, db)
+}
+
+func gracefulShutdown(ctx context.Context, components ...NamedCloser) <-chan struct{} {
+	var gracefulStop = make(chan os.Signal, 1)
+	signal.Notify(gracefulStop, os.Interrupt, syscall.SIGTERM)
+	end := make(chan struct{})
+	stop := func() {
+		for _, c := range components {
+			if err := c.Close(); err != nil {
+				log.WithError(err).WithField("component", c.Name()).Warn("Unable to close the component")
+			}
+		}
+		close(end)
+	}
+
+	go func() {
+		for {
+			select {
+			case sig := <-gracefulStop:
+				log.Warnf("Stopping the app due to a caught sig %+v", sig)
+				stop()
+			case <-ctx.Done():
+				log.Warn("Stopping the app due to a canceled context")
+				stop()
+			}
+		}
+	}()
+
+	return end
 }

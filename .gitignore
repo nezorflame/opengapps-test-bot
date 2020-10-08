@@ -17,6 +17,7 @@
 bin/
 vendor/
 config.toml
+opengapps-test-bot.service
 debug
 .DS_Store
 *.db

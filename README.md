@@ -1,4 +1,4 @@
-# example-telegram-bot [![CircleCI](https://circleci.com/gh/nezorflame/example-telegram-bot/tree/master.svg?style=svg)](https://circleci.com/gh/nezorflame/example-telegram-bot/tree/master) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/example-telegram-bot)](https://goreportcard.com/report/github.com/nezorflame/example-telegram-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/example-telegram-bot.svg)](https://golangci.com/r/github.com/nezorflame/example-telegram-bot) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot?ref=badge_shield)
+# opengapps-test-bot [![CircleCI](https://circleci.com/gh/nezorflame/opengapps-test-bot/tree/master.svg?style=svg)](https://circleci.com/gh/nezorflame/opengapps-test-bot/tree/master) [![Go Report Card](https://goreportcard.com/badge/github.com/nezorflame/opengapps-test-bot)](https://goreportcard.com/report/github.com/nezorflame/opengapps-test-bot) [![GolangCI](https://golangci.com/badges/github.com/nezorflame/opengapps-test-bot.svg)](https://golangci.com/r/github.com/nezorflame/opengapps-test-bot) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-test-bot.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-test-bot?ref=badge_shield)
 
 Example bot template for Telegram.
 
@@ -39,4 +39,5 @@ To add another custom command handler, you can:
 - edit `internal/pkg`
 
 ## License
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fexample-telegram-bot?ref=badge_large)
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-test-bot.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnezorflame%2Fopengapps-test-bot?ref=badge_large)

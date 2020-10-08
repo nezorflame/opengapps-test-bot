@@ -1,4 +1,4 @@
-CMD:=example-telegram-bot
+CMD:=opengapps-test-bot
 PKG_LIST:=$(shell go list ./...)
 GIT_HASH?=$(shell git log --format="%h" -n 1 2> /dev/null)
 GIT_BRANCH?=$(shell git branch 2> /dev/null | grep '*' | cut -f2 -d' ')

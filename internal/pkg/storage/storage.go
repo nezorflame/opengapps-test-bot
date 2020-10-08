@@ -1,31 +1,30 @@
-package db
+package storage
 
 import (
-	"os"
+	"errors"
+	"fmt"
 	"sort"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.etcd.io/bbolt"
 )
 
-// Package vars
+// Package errors
 var (
 	ErrNotFound = errors.New("key not found")
 	ErrNilValue = errors.New("value is nil")
-
-	bucketName = []byte("global")
 )
 
-// DB describes local BoltDB database
-type DB struct {
-	b       *bbolt.DB
+var bucketName = []byte("global")
+
+type storage struct {
+	db      *bbolt.DB
 	timeout time.Duration
 }
 
-// New creates new instance of bolt DB
-func New(path string, timeout time.Duration) (*DB, error) {
+// New creates new instance of storage
+func New(path string, timeout time.Duration) (*storage, error) {
 	// open connection to the DB
 	log.WithField("path", path).WithField("timeout", timeout).Debug("Creating DB connection")
 	opts := bbolt.DefaultOptions
@@ -34,7 +33,7 @@ func New(path string, timeout time.Duration) (*DB, error) {
 	}
 	b, err := bbolt.Open(path, 0755, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open DB")
+		return nil, fmt.Errorf("unable to open DB: %w", err)
 	}
 
 	// create global bucket if it doesn't exist yet
@@ -44,46 +43,20 @@ func New(path string, timeout time.Duration) (*DB, error) {
 		return bErr
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create global bucket")
+		return nil, fmt.Errorf("unable to create global bucket: %w", err)
 	}
 
 	// return the DB
-	db := &DB{b: b, timeout: timeout}
+	db := &storage{db: b, timeout: timeout}
 	log.Debug("DB initiated")
 	return db, nil
 }
 
-// Close closes the DB
-func (db *DB) Close(delete bool) error {
-	log.Debug("Closing the DB")
-	path := db.b.Path()
-	done := make(chan error)
-	go func() {
-		done <- db.b.Close()
-		log.Debug("DB closed OK")
-		close(done)
-	}()
-	timer := time.NewTimer(db.timeout)
-	if delete {
-		defer os.Remove(path)
-	}
-
-	select {
-	case err := <-done:
-		if err != nil {
-			return errors.Wrap(err, "unable to close DB")
-		}
-		return nil
-	case <-timer.C:
-		return errors.Wrap(bbolt.ErrTimeout, "unable to close DB")
-	}
-}
-
 // Keys returns a list of available keys in the global bucket, sorted alphabetically
-func (db *DB) Keys() ([]string, error) {
+func (s *storage) Keys() ([]string, error) {
 	var keys []string
 	log.Debug("Getting the list of DB current keys")
-	err := db.b.View(func(tx *bbolt.Tx) error {
+	err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
 			return bbolt.ErrBucketNotFound
@@ -96,17 +69,17 @@ func (db *DB) Keys() ([]string, error) {
 		})
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get the list of keys from DB")
+		return nil, fmt.Errorf("unable to get the list of keys from DB: %w", err)
 	}
 	sort.Strings(keys)
 	return keys, nil
 }
 
-// Get acquires value from DB by provided key
-func (db *DB) Get(key string) ([]byte, error) {
+// Get acquires value from storage by provided key
+func (s *storage) Get(key string) ([]byte, error) {
 	var value []byte
 	log.WithField("key", key).Debug("Getting value from DB")
-	err := db.b.View(func(tx *bbolt.Tx) error {
+	err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
 			return bbolt.ErrBucketNotFound
@@ -122,16 +95,16 @@ func (db *DB) Get(key string) ([]byte, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get value for key '%s' from DB")
+		return nil, fmt.Errorf("unable to get value for key '%s' from DB: %w", key, err)
 	}
 	log.WithField("key", key).Debug("Got the value")
 	return value, nil
 }
 
-// Put sets/updates the value in DB by provided bucket and key
-func (db *DB) Put(key string, val []byte) error {
+// Put sets/updates the value in storage by provided bucket and key
+func (s *storage) Put(key string, val []byte) error {
 	log.WithField("key", key).Debug("Saving the value to DB")
-	err := db.b.Update(func(tx *bbolt.Tx) error {
+	err := s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
 			return bbolt.ErrBucketNotFound
@@ -139,15 +112,15 @@ func (db *DB) Put(key string, val []byte) error {
 		return b.Put([]byte(key), val)
 	})
 	if err != nil {
-		return errors.Wrapf(err, "unable to put value for key '%s' to DB", key)
+		return fmt.Errorf("unable to put value for key '%s' to DB: %w", key, err)
 	}
 	return nil
 }
 
-// Delete removes the value from DB by provided bucket and key
-func (db *DB) Delete(key string) error {
+// Delete removes the value from storage by provided bucket and key
+func (s *storage) Delete(key string) error {
 	log.WithField("key", key).Debug("Deleting from DB")
-	err := db.b.Update(func(tx *bbolt.Tx) error {
+	err := s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
 			return bbolt.ErrBucketNotFound
@@ -155,18 +128,45 @@ func (db *DB) Delete(key string) error {
 		return b.Delete([]byte(key))
 	})
 	if err != nil {
-		return errors.Wrapf(err, "unable to delete value for key '%s' from DB", key)
+		return fmt.Errorf("unable to delete value for key '%s' from DB: %w", key, err)
 	}
 	return nil
 }
 
-// Purge removes the bucket from DB
-func (db *DB) Purge() error {
-	err := db.b.Update(func(tx *bbolt.Tx) error {
+// Purge removes the bucket from storage
+func (s *storage) Purge() error {
+	err := s.db.Update(func(tx *bbolt.Tx) error {
 		return tx.DeleteBucket(bucketName)
 	})
 	if err != nil {
-		return errors.Wrap(err, "unable to purge global bucket from DB")
+		return fmt.Errorf("unable to purge global bucket from DB: %w", err)
 	}
 	return nil
+}
+
+// Close closes the storage
+func (s *storage) Close() error {
+	log.Debug("Closing the DB")
+	done := make(chan error)
+	go func() {
+		done <- s.db.Close()
+		log.Debug("DB closed OK")
+		close(done)
+	}()
+	timer := time.NewTimer(s.timeout)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("unable to close DB: %w", err)
+		}
+		return nil
+	case <-timer.C:
+		return fmt.Errorf("unable to close DB: %w", bbolt.ErrTimeout)
+	}
+}
+
+// Name returns the storage identifier
+func (s *storage) Name() string {
+	return "storage"
 }
