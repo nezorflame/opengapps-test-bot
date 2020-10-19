@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/nezorflame/opengapps-test-bot/internal/pkg/config"
 	"github.com/nezorflame/opengapps-test-bot/internal/pkg/storage"
-	"github.com/nezorflame/opengapps-test-bot/pkg/telegram"
+	"github.com/nezorflame/opengapps-test-bot/internal/pkg/telegram"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -72,33 +70,4 @@ func main() {
 	// graceful shutdown
 	log.Debug("Initiating system signal watcher")
 	<-gracefulShutdown(ctx, bot, db)
-}
-
-func gracefulShutdown(ctx context.Context, components ...NamedCloser) <-chan struct{} {
-	var gracefulStop = make(chan os.Signal, 1)
-	signal.Notify(gracefulStop, os.Interrupt, syscall.SIGTERM)
-	end := make(chan struct{})
-	stop := func() {
-		for _, c := range components {
-			if err := c.Close(); err != nil {
-				log.WithError(err).WithField("component", c.Name()).Warn("Unable to close the component")
-			}
-		}
-		close(end)
-	}
-
-	go func() {
-		for {
-			select {
-			case sig := <-gracefulStop:
-				log.Warnf("Stopping the app due to a caught sig %+v", sig)
-				stop()
-			case <-ctx.Done():
-				log.Warn("Stopping the app due to a canceled context")
-				stop()
-			}
-		}
-	}()
-
-	return end
 }

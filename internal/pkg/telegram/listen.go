@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (b *Bot) listen(updates tgbotapi.UpdatesChannel) {
+func (b *bot) listen(updates tgbotapi.UpdatesChannel) {
 	for u := range updates {
 		if u.Message == nil { // ignore any non-Message Updates
 			continue
@@ -26,15 +26,15 @@ func (b *Bot) listen(updates tgbotapi.UpdatesChannel) {
 	}
 }
 
-func (b *Bot) hello(msg *tgbotapi.Message) {
+func (b *bot) hello(msg *tgbotapi.Message) {
 	b.reply(msg.Chat.ID, msg.MessageID, b.cfg.GetString("messages.hello"))
 }
 
-func (b *Bot) help(msg *tgbotapi.Message) {
+func (b *bot) help(msg *tgbotapi.Message) {
 	b.reply(msg.Chat.ID, msg.MessageID, b.cfg.GetString("messages.help"))
 }
 
-func (b *Bot) reply(chatID int64, msgID int, text string) {
+func (b *bot) reply(chatID int64, msgID int, text string) {
 	log.WithField("chat_id", chatID).WithField("msg_id", msgID).Debug("Sending reply")
 	msg := tgbotapi.NewMessage(chatID, fmt.Sprint(text))
 	if msgID != 0 {

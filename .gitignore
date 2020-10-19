@@ -19,5 +19,6 @@ vendor/
 config.toml
 opengapps-test-bot.service
 debug
+__debug_bin
 .DS_Store
 *.db

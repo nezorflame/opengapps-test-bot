@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"errors"
 	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
@@ -9,39 +8,54 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Bot describes Telegram bot
-type Bot struct {
+// bot describes Telegram bot
+type bot struct {
 	api *tgbotapi.BotAPI
 	cfg *viper.Viper
+
+	lastOffset int
 }
 
+const (
+	defaultLastOffset = -1
+)
+
 // NewBot creates new instance of Bot
-func NewBot(cfg *viper.Viper) (*Bot, error) {
-	if cfg == nil {
-		return nil, errors.New("empty config")
+func NewBot(opts ...OptionFunc) (*bot, error) {
+	b := &bot{}
+	for _, o := range opts {
+		if err := o(b); err != nil {
+			return nil, fmt.Errorf("unable to create new bot: %w", err)
+		}
 	}
 
-	api, err := tgbotapi.NewBotAPI(cfg.GetString("telegram.token"))
+	if b.lastOffset == 0 {
+		log.WithField("offset", defaultLastOffset).Warn("Setting default last offset")
+		b.lastOffset = defaultLastOffset
+	}
+
+	api, err := tgbotapi.NewBotAPI(b.cfg.GetString("telegram.token"))
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to Telegram: %w", err)
 	}
+	b.api = api
 
 	if err = tgbotapi.SetLogger(log.WithField("source", "telegram-api")); err != nil {
 		return nil, fmt.Errorf("unable to set Telegram logger: %w", err)
 	}
 
-	if cfg.GetBool("telegram.debug") {
+	if b.cfg.GetBool("telegram.debug") {
 		log.Debug("Enabling debug mode for bot")
 		api.Debug = true
 	}
 
 	log.Debugf("Authorized on account %s", api.Self.UserName)
-	return &Bot{api: api, cfg: cfg}, nil
+	return b, nil
 }
 
 // Start starts to listen the bot updates channel
-func (b *Bot) Start(lastOffset int) error {
-	update := tgbotapi.NewUpdate(lastOffset + 1)
+func (b *bot) Start() error {
+	update := tgbotapi.NewUpdate(b.lastOffset + 1)
 	update.Timeout = b.cfg.GetInt("telegram.timeout")
 	updates, err := b.api.GetUpdatesChan(update)
 	if err != nil {
@@ -53,12 +67,12 @@ func (b *Bot) Start(lastOffset int) error {
 }
 
 // Close stops the bot
-func (b *Bot) Close() error {
+func (b *bot) Close() error {
 	b.api.StopReceivingUpdates()
 	return nil
 }
 
 // Name returns the bot identifier
-func (b *Bot) Name() string {
+func (b *bot) Name() string {
 	return "bot"
 }
